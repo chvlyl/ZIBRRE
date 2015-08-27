@@ -1,0 +1,417 @@
+---
+title: "ZIBR random effect"
+author: "Eric Z Chen"
+date: "January 4, 2015"
+output: 
+  html_document: 
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+---
+
+
+```{r setup, include=FALSE}
+####### install necessary packages
+packages <- c(#'knitr',
+              'pheatmap','reshape2',
+              'ggplot2','tidyr','dplyr')
+for (pk in packages){
+  if (!require(pk,character.only = TRUE)){
+    if(pk=='pheatmap'){
+      devtools::install_github("raivokolde/pheatmap")
+    }
+    else{
+      install.packages(pk,dep=TRUE,repos="http://cran.us.r-project.org")
+    }
+  }
+  require(pk,character.only = TRUE,quietly=TRUE)
+}
+
+#########################
+### change the working directory
+try(setwd('3_Analysis/'))
+
+
+#####################################################
+#### load the package instead of sourcing the code in the future  
+source('../../14_Metagenomic_toolkit/metagenomic_toolkit/R/merge_two_tables.R')
+source('zibr_random_effect.R')
+
+########################################################
+####
+source('../1_Package/ZIBRE/R/zibre.R')
+source('../1_Package/ZIBRE/R/fit_beta_regression_random_effect.R')
+source('../1_Package/ZIBRE/R/fit_logistic_regression_random_effect.R')
+source('../1_Package/ZIBRE/R/fit_zero_inflated_beta_regression_random_effect.R')
+source('../1_Package/ZIBRE/R/generate_gaussian_quad_points.R')
+
+
+
+####################################################
+#opts_chunk$set(#fig.path = '~/3_Results/',
+#  root.dir = '../3_Results/',
+#  progress = TRUE, verbose = TRUE,
+#  warning=FALSE, message=FALSE,echo=TRUE)
+```  
+
+
+
+
+```{r simulation, cache=TRUE}
+sim <- simulate_data_zibr_time(subject.n=20,time.n=4,alpha=as.matrix(c(0,0.5,-1)),beta=as.matrix(c(-0.5,-0.5,0.5)),sim.seed=1)
+v.init <- sim$v
+s1.init <- sim$s1
+s2.init <- sim$s2
+X.coeff.init <- sim$alpha
+Z.coeff.init <- sim$beta
+X <- sim$X
+Z <- sim$Z
+Y <- sim$Y
+subject.ID <- sim$subject.ID
+time.ind  <- sim$time.ind
+X <- as.matrix(X)
+Y <- as.matrix(Y)
+Z <- as.matrix(Z)
+X.aug <- cbind(intersept = 1, X)
+Z.aug <- cbind(intersept = 1, Z)
+X.test.coeff.index <- rep(FALSE,ncol(X.aug))
+Z.test.coeff.index <- rep(FALSE,ncol(Z.aug))
+##### H1
+X.test.coeff.index <- rep(FALSE,ncol(X.aug))
+Z.test.coeff.index <- rep(FALSE,ncol(Z.aug))
+### v, s1, s2, alpha, beta
+opt.H1 <- nlminb(c(rep(1,3), rep(0,sum(!X.test.coeff.index)+sum(!Z.test.coeff.index))),  
+                 calculate_likelihood_zibr, 
+                 lower = c(rep(0.00001,3),rep(-Inf,sum(!X.test.coeff.index)+sum(!Z.test.coeff.index))), 
+                 upper = c(Inf), control=list(iter.max=500,eval.ma=500,trace=2),
+                 X.test.coeff.index = X.test.coeff.index, 
+                 Z.test.coeff.index = Z.test.coeff.index,
+                 Y=Y,X.aug=X.aug,Z.aug=Z.aug,time=time.ind,subject=subject.ID,verbose=FALSE)
+```
+
+
+## Real data analysis
+
+### Load real data
+```{r load_data,cache=TRUE}
+##############################################
+##### Load MetaPhlAn results
+TLevel <- 'G'
+### Only need the PLEASE data
+PLEASE.file <- paste('../0_Data/MetaPhlAn/PLEASE/',TLevel,
+            '_Remove_unclassfied_Renormalized_Merge_Rel_MetaPhlAn_Result.xls',sep='')
+PLEASE.raw <- read.table(PLEASE.file,sep='\t',header=TRUE,row.names = 1,
+                         check.names=FALSE,stringsAsFactors=FALSE)
+PLEASE.raw <- t(PLEASE.raw)
+cat('samples','taxa',dim(PLEASE.raw),'\n')
+PLEASE.raw[1:3,1:3]
+
+taxa.raw <- PLEASE.raw
+  
+###################################
+### load total non-human read counts
+human.read.file <- '../0_Data/Human_Reads/please_combo_human_reads.xls'
+human.read <- read.table(human.read.file,sep='\t',header=TRUE,
+                         row.names=1,stringsAsFactors=FALSE)
+
+############################
+### Filter low depth samples
+low.depth.samples <- subset(human.read,NonHumanReads<20000)
+low.depth.samples[,1:5]
+
+### Delete these samples from PLEASE data.
+### Due to the low sequencing depth, some of the samples have no MetaPhlAn output
+### These are the samples with MetaPhlAn output but also low sequencing
+rownames(taxa.raw)[which(rownames(taxa.raw) %in% rownames(low.depth.samples))]
+### Before deletion
+dim(taxa.raw)
+### After deletion
+taxa.raw <- taxa.raw[-which(rownames(taxa.raw) %in% rownames(low.depth.samples)),]
+dim(taxa.raw)
+
+####################################
+### Filter low abundant bacterial data
+filter.index1 <- apply(taxa.raw,2,function(X){sum(X>0)>0.4*length(X)})
+filter.index2 <- apply(taxa.raw,2,function(X){quantile(X,0.8)>0.1})
+taxa.filter <- taxa.raw[,filter.index1 & filter.index2]
+taxa.filter <- 100*sweep(taxa.filter, 1, rowSums(taxa.filter), FUN="/")
+cat('after filter:','samples','taxa',dim(taxa.filter),'\n')
+head(rowSums(taxa.filter))
+
+####
+taxa.data <- taxa.filter
+
+
+###########################
+#### Load sample information
+sample.info.file <- '../0_Data/Sample_Information/2015_02_13_Processed_Sample_Information.csv'
+sample.info <- read.csv(sample.info.file,row.names=1)
+
+
+rm(PLEASE.file)
+rm(PLEASE.raw)
+rm(human.read.file)
+rm(filter.index1)
+rm(filter.index2)
+rm(sample.info.file)
+```
+
+
+### Fit ZIBR on real data 
+```{r fit_zibr_re}
+######
+reg.cov <-
+data.frame(Sample=rownames(taxa.data),stringsAsFactors = FALSE) %>% 
+left_join(add_rownames(sample.info,var = 'Sample'),by='Sample')%>%
+dplyr::filter(!is.na(Response)) %>%
+dplyr::select(Sample,Time,Subject,Response) %>%
+group_by(Subject) %>% summarise(count = n()) %>% dplyr::filter(count==4) %>%
+dplyr::select(Subject) %>%
+left_join(add_rownames(sample.info,var = 'Sample'),by='Subject') %>%
+mutate(Response=ifelse(Response=='Response',1,0)) %>%
+dplyr::select(Sample,Subject,Time,Response)
+
+######
+X <- as.matrix(reg.cov[,c('Time','Response')])
+colnames(X) <- 'Response'
+rownames(X) <- reg.cov$Sample
+Z <- X
+subject.ind <- reg.cov$Subject
+time.ind   <- reg.cov$Time
+taxa.data.fit  <- taxa.data[reg.cov$Sample,]
+
+###############
+
+spe.all <- colnames(taxa.data.fit)
+p.species = matrix(NA,nrow=length(spe.all),ncol=12)
+rownames(p.species) = spe.all
+colnames(p.species) = c('logistic.response.coef','logistic.response.pval',
+                        'logistic.time.coef','logistic.time.pval',
+                        'logstic.s1',
+                        'beta.response.coef','beta.response.pval',
+                        'beta.time.coef','beta.time.pval',
+                        'beta.s2','beta.v',
+                        'overall.p')
+
+
+for (spe in spe.all){
+  spe <- 'g__Escherichia'
+  print(spe)
+  Y <- taxa.data.fit[,spe,drop=F]/100
+  cat('Zeros/All',sum(Y==0),'/',length(Y),'\n')
+  if (sum(Y>0)<10 | sum(Y==0) <10 | max(Y)<0.01){
+    print('skip')
+    next
+  }else{
+    est <- zibre(logistic.cov=X,beta.cov=Z,Y=Y,
+                 subject.ind=subject.ind,
+                 time.ind=time.ind,
+                 quad.n=30,verbose=TRUE)
+    p.species[spe,c(3,1,4,2)] <- as.vector(est$logistic.est.table[-1,])
+    p.species[spe,c(8,6,9,7)] <- as.vector(est$beta.est.table[-1,])
+    p.species[spe,5]  <-  est$logistic.s1.est
+    p.species[spe,10] <- est$beta.s2.est
+    p.species[spe,11] <- est$beta.v.est
+    p.species[spe,12] <- est$overall.test.p
+  }
+  break
+}
+
+####
+#write.csv(p.species,file=paste('../4_Results/Real_Data_Estimation_Results_Time_Response.csv',sep=''))
+```
+
+
+
+```{r boxplot}
+for (spe in spe.all){
+  spe <- 'g__Parabacteroides'
+  abu <- taxa.data.fit[,spe,drop=FALSE]
+  colnames(abu) <- 'Taxa'
+  add_rownames(as.data.frame(abu),var='Sample') %>% 
+  left_join(add_rownames(sample.info,var='Sample'),by='Sample') %>% 
+  dplyr::select(Taxa,Response,Time) %>%
+  dplyr::mutate(dummy=factor(1)) %>%
+  (function(pdata){
+  p<- pdata %>% dplyr::filter(Taxa>0) %>%
+  ggplot(aes(factor(Time),Taxa))+
+  geom_boxplot() + 
+  facet_grid(.~Response, margins=TRUE) +
+  ylim(c(0,5))
+  plot(p)
+  })
+}
+```
+
+
+### Fit ZIBR on real data (logFCP)
+```{r fit_zibr_re}
+######
+reg.cov <-
+data.frame(Sample=rownames(taxa.data),stringsAsFactors = FALSE) %>% 
+left_join(add_rownames(sample.info,var = 'Sample'),by='Sample')%>%
+dplyr::filter(!is.na(log.FCP)) %>%
+dplyr::select(Sample,Time,Subject,log.FCP) %>%
+group_by(Subject) %>% summarise(count = n()) %>% dplyr::filter(count==4) %>%
+dplyr::select(Subject) %>%
+left_join(add_rownames(sample.info,var = 'Sample'),by='Subject') %>%
+#mutate(FCP=log10(FCP)) %>%
+dplyr::select(Sample,Subject,Time,log.FCP)
+
+######
+X <- as.matrix(reg.cov[,c('log.FCP')])
+colnames(X) <- 'log.FCP'
+rownames(X) <- reg.cov$Sample
+Z <- X
+subject.ind <- reg.cov$Subject
+time.ind   <- reg.cov$Time
+taxa.data.fit  <- taxa.data[reg.cov$Sample,]
+
+###############
+
+spe.all <- colnames(taxa.data.fit)
+p.species = matrix(NA,nrow=length(spe.all),ncol=12)
+rownames(p.species) = spe.all
+colnames(p.species) = c('logistic.logFCP.coef','logistic.logFCP.pval',
+                        'logistic.time.coef','logistic.time.pval',
+                        'logstic.s1',
+                        'beta.logFCP.coef','beta.logFCP.pval',
+                        'beta.time.coef','beta.time.pval',
+                        'beta.s2','beta.v',
+                        'overall.p')
+
+
+for (spe in spe.all){
+  #spe <- 'g__Haemophilu'
+  print(spe)
+  Y <- taxa.data.fit[,spe,drop=F]/100
+  cat('Zeros/All',sum(Y==0),'/',length(Y),'\n')
+  if (sum(Y>0)<10 | sum(Y==0) <10 | max(Y)<0.01){
+    print('skip')
+    next
+  }else{
+    est <- zibre(logistic.cov=X,beta.cov=Z,Y=Y,
+                 subject.ind=subject.ind,
+                 time.ind=time.ind,
+                 quad.n=30,verbose=TRUE)
+    p.species[spe,c(1,2)] <- as.vector(est$logistic.est.table[-1,])
+    p.species[spe,c(6,7)] <- as.vector(est$beta.est.table[-1,])
+    p.species[spe,5]  <-  est$logistic.s1.est
+    p.species[spe,10] <- est$beta.s2.est
+    p.species[spe,11] <- est$beta.v.est
+    p.species[spe,12] <- est$overall.test.p
+  }
+  #break
+}
+
+####
+write.csv(p.species,file=paste('../4_Results/Real_Data_Estimation_Results_logFCP.csv',sep=''))
+
+
+
+for (spe in spe.all){
+  spe <- 'g__Alistipes'
+  abu <- taxa.data.fit[,spe,drop=FALSE]
+  colnames(abu) <- 'Taxa'
+  add_rownames(as.data.frame(abu),var='Sample') %>% 
+  left_join(add_rownames(sample.info,var='Sample'),by='Sample') %>% 
+  dplyr::select(Taxa,log.FCP,Time) %>%
+  dplyr::mutate(dummy=factor(1)) %>%
+  (function(pdata){
+  p<- pdata %>% dplyr::filter(Taxa>0) %>%
+  #cor(log10(p$Taxa),p$log.FCP,method='spearman')
+  ggplot(aes(log.FCP,log(Taxa/(100-Taxa))))+
+  geom_point() #+ 
+  #facet_grid(.~Response, margins=TRUE) +
+  #ylim(c(0,5))
+  #print(p)
+  plot(p)
+  })
+}
+```
+
+
+
+```{r heatmap}
+bk = unique(c(seq(0,5, length=100),seq(5,10,length=100),seq(10,100,length=100)))
+hmcols<- colorRampPalette(c("white","firebrick3","yellow"))(length(bk)-1) 
+spe.ind <- apply(fdata,2,mad)>0
+sample.ind <- rownames(subset(sample.info.alltime,
+              Treatment=='antiTNF' & Response=='Response'& Time==1))
+pheatmap(t(fdata[sample.ind,spe.ind]),border_color="grey60",
+         #clustering_distance_rows = 'correlation',
+         #clustering_distance_cols = 'manhattan',
+         cluster_rows = F,
+         clustering_method = "average",
+         annotation=sample.info.alltime[,c("Response","Antibiotics.visit")],
+         color =hmcols, breaks=bk,
+         #show_rownames = show.rownames,
+         scale="none"
+         )
+sample.ind <- rownames(subset(sample.info.alltime,
+              Treatment=='antiTNF' & Response=='Response'& Time==2))
+pheatmap(t(fdata[sample.ind,spe.ind]),border_color="grey60",
+         #clustering_distance_rows = 'correlation',
+         #clustering_distance_cols = 'manhattan',
+         cluster_rows = F,
+         clustering_method = "average",
+         annotation=sample.info.alltime[,c("Response","Antibiotics.visit")],
+         color =hmcols, breaks=bk,
+         #show_rownames = show.rownames,
+         scale="none"
+         )
+sample.ind <- rownames(subset(sample.info.alltime,
+              Treatment=='antiTNF' & Response=='Response'& Time==3))
+pheatmap(t(fdata[sample.ind,spe.ind]),border_color="grey60",
+         #clustering_distance_rows = 'correlation',
+         #clustering_distance_cols = 'manhattan',
+         cluster_rows = F,
+         clustering_method = "average",
+         annotation=sample.info.alltime[,c("Response","Antibiotics.visit")],
+         color =hmcols, breaks=bk,
+         #show_rownames = show.rownames,
+         scale="none"
+         )
+sample.ind <- rownames(subset(sample.info.alltime,
+              Treatment=='antiTNF' & Response=='Response'& Time==4))
+pheatmap(t(fdata[sample.ind,spe.ind]),border_color="grey60",
+         #clustering_distance_rows = 'correlation',
+         #clustering_distance_cols = 'manhattan',
+         cluster_rows = F,
+         clustering_method = "average",
+         annotation=sample.info.alltime[,c("Response","Antibiotics.visit")],
+         color =hmcols, breaks=bk,
+         #show_rownames = show.rownames,
+         scale="none"
+         )
+
+resp<-'Response'
+resp<-'Non.Response'
+treat<-'antiTNF'
+#treat<-'Diet'
+spe<-'s__Escherichia_coli'
+s1 <- rownames(subset(sample.info.alltime,
+              Treatment==treat & Response==resp& Time==1))
+s2 <- rownames(subset(sample.info.alltime,
+              Treatment==treat & Response==resp& Time==2))
+s3 <- rownames(subset(sample.info.alltime,
+              Treatment==treat & Response==resp& Time==3))
+s4 <- rownames(subset(sample.info.alltime,
+              Treatment==treat & Response==resp& Time==4))
+pdata<-data.frame(Abu=fdata[c(s1,s2,s3,s4),spe],
+Time=c(rep(1,length(s1)),rep(2,length(s2)),rep(3,length(s3)),rep(4,length(s4))))
+
+pdata.nonzero<-pdata[pdata$Abu>0,]
+boxplot(Abu~Time,data=pdata.nonzero,
+        ylim=c(0,30),xlab='Time',ylab='Abundance (%)',main=paste(treat,resp))
+
+
+pdata.present <- pdata %>%
+  group_by(Time) %>%
+    summarise(
+      Present=sum(Abu>0, na.rm = TRUE)/length(Abu)
+    ) 
+barplot(pdata.present[,2]*100,ylim=c(0,100),main=paste(treat,resp),
+        names.arg = pdata.present[,1],xlab='Time',ylab='Present %')
+```
+
