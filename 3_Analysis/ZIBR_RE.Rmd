@@ -13,12 +13,16 @@ output:
 ```{r setup, include=FALSE}
 ####### install necessary packages
 packages <- c(#'knitr',
+              'metakit',
               'pheatmap','reshape2',
               'ggplot2','tidyr','dplyr')
 for (pk in packages){
   if (!require(pk,character.only = TRUE)){
     if(pk=='pheatmap'){
       devtools::install_github("raivokolde/pheatmap")
+    } 
+    else if (pk=='metakit'){
+      devtools::install_github("chvlyl/metakit")
     }
     else{
       install.packages(pk,dep=TRUE,repos="http://cran.us.r-project.org")
@@ -34,9 +38,6 @@ try(setwd('3_Analysis/'))
 
 #####################################################
 #### load the package instead of sourcing the code in the future  
-source('../../14_Metagenomic_toolkit/metagenomic_toolkit/R/merge_two_tables.R')
-source('zibr_random_effect.R')
-
 ########################################################
 ####
 source('../1_Package/ZIBRE/R/zibre.R')
@@ -57,7 +58,7 @@ source('../1_Package/ZIBRE/R/generate_gaussian_quad_points.R')
 
 
 
-```{r simulation, cache=TRUE}
+```{r simulation, cache=TRUE,eval=FALSE}
 sim <- simulate_data_zibr_time(subject.n=20,time.n=4,alpha=as.matrix(c(0,0.5,-1)),beta=as.matrix(c(-0.5,-0.5,0.5)),sim.seed=1)
 v.init <- sim$v
 s1.init <- sim$s1
@@ -157,8 +158,8 @@ rm(sample.info.file)
 ```
 
 
-### Fit ZIBR on real data 
-```{r fit_zibr_re}
+### Fit ZIBR on real data: time and response
+```{r fit_zibrre_time_response}
 ######
 reg.cov <-
 data.frame(Sample=rownames(taxa.data),stringsAsFactors = FALSE) %>% 
@@ -244,8 +245,8 @@ for (spe in spe.all){
 ```
 
 
-### Fit ZIBR on real data (logFCP)
-```{r fit_zibr_re}
+### Fit ZIBR on real data: logFCP
+```{r fit_zibrre_logfcp}
 ######
 reg.cov <-
 data.frame(Sample=rownames(taxa.data),stringsAsFactors = FALSE) %>% 
