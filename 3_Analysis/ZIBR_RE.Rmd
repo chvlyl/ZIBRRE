@@ -117,7 +117,7 @@ human.read <- read.table(human.read.file,sep='\t',header=TRUE,
 
 ############################
 ### Filter low depth samples
-low.depth.samples <- subset(human.read,NonHumanReads<20000)
+low.depth.samples <- subset(human.read,NonHumanReads<10000)
 low.depth.samples[,1:5]
 
 ### Delete these samples from PLEASE data.
@@ -141,7 +141,7 @@ head(rowSums(taxa.filter))
 
 ####
 taxa.data <- taxa.filter
-
+dim(taxa.data)
 
 ###########################
 #### Load sample information
@@ -196,8 +196,8 @@ colnames(p.species) = c('logistic.response.coef','logistic.response.pval',
 
 
 for (spe in spe.all){
-  spe <- 'g__Escherichia'
-  print(spe)
+  #spe <- 'g__Escherichia'
+  cat(spe,'\n')
   Y <- taxa.data.fit[,spe,drop=F]/100
   cat('Zeros/All',sum(Y==0),'/',length(Y),'\n')
   if (sum(Y>0)<10 | sum(Y==0) <10 | max(Y)<0.01){
@@ -215,18 +215,16 @@ for (spe in spe.all){
     p.species[spe,11] <- est$beta.v.est
     p.species[spe,12] <- est$overall.test.p
   }
-  break
+  #break
 }
 
 ####
-#write.csv(p.species,file=paste('../4_Results/Real_Data_Estimation_Results_Time_Response.csv',sep=''))
-```
+write.csv(p.species,file=paste('../4_Results/Real_Data_Estimation_Results_Time_Response.csv',sep=''))
 
-
-
-```{r boxplot}
+####################
+#### Boxplot
 for (spe in spe.all){
-  spe <- 'g__Parabacteroides'
+  #spe <- 'g__Parabacteroides'
   abu <- taxa.data.fit[,spe,drop=FALSE]
   colnames(abu) <- 'Taxa'
   add_rownames(as.data.frame(abu),var='Sample') %>% 
@@ -242,6 +240,12 @@ for (spe in spe.all){
   plot(p)
   })
 }
+```
+
+
+
+```{r boxplot}
+
 ```
 
 
@@ -284,7 +288,7 @@ colnames(p.species) = c('logistic.logFCP.coef','logistic.logFCP.pval',
 
 for (spe in spe.all){
   #spe <- 'g__Haemophilu'
-  print(spe)
+  cat(spe,'\n')
   Y <- taxa.data.fit[,spe,drop=F]/100
   cat('Zeros/All',sum(Y==0),'/',length(Y),'\n')
   if (sum(Y>0)<10 | sum(Y==0) <10 | max(Y)<0.01){
@@ -306,7 +310,7 @@ for (spe in spe.all){
 }
 
 ####
-write.csv(p.species,file=paste('../4_Results/Real_Data_Estimation_Results_logFCP.csv',sep=''))
+write.csv(p.species[,-c(3,4,8,9)],file=paste('../4_Results/Real_Data_Estimation_Results_logFCP.csv',sep=''))
 
 
 
