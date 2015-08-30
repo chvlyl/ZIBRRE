@@ -87,11 +87,17 @@ list_to_vector = function(est){
 ## Simulation
 
 ### Parameter estimation
-```{r simulation, cache=TRUE,eval=FALSE}
+```{r simulation, cache=TRUE}
 sim.N <- 1000
 sub.N <- c(20,50,100,200)
 time.N <- c(5,10,20)
+alpha.true <- as.matrix(c(-0.5,1))
+beta.true <- as.matrix(c(-0.5,0.5))
+s1.true <- 1
+s2.true <- 2
+v.true <- 5
 est.avg.list <- list()
+est.var.list <- list()
 for (subject.n in sub.N){
   for (time.n in time.N){
     cat('Subject ',subject.n,' Time ', time.n, '\n')
@@ -102,11 +108,11 @@ for (subject.n in sub.N){
                   subject.n=subject.n,time.n=time.n,
                   X=as.matrix(c(rep(0,subject.n/2*time.n),rep(1,subject.n/2*time.n))),
                   ##logistic
-                  alpha=as.matrix(c(-0.5,1)),
+                  alpha=alpha.true,
                   ##beta
-                  beta=as.matrix(c(-0.5,0.5)),
-                  s1=1,s2=1,
-                  v=5,
+                  beta=beta.true,
+                  s1=s1.true,s2=s2.true,
+                  v=v.true,
                   sim.seed=sim.n)
       v.init <- sim$v
       s1.init <- sim$s1
@@ -128,10 +134,14 @@ for (subject.n in sub.N){
       est.list[[paste('sim',sim.n,sep='')]] <- list_to_vector(est)
     }
     est.mat <- t(as.data.frame(est.list))
-    est.avg.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,median)
+    est.avg.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,mean)
+    est.var.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,sd)
   }
 }
 est.avg.mat <- t(as.data.frame(est.avg.list))
+est.var.mat <- t(as.data.frame(est.var.list))
+write.csv(est.avg.mat,file=paste('../4_Results/Simulation_Parameter_Estimation_a_n05_1_b_neg05_05_s1_s2_1_v_5_Mean.csv',sep=''))
+write.csv(est.var.mat,file=paste('../4_Results/Simulation_Parameter_Estimation_a_n05_1_b_neg05_05_s1_s2_1_v_5_Var.csv',sep=''))
 ```
 
 
