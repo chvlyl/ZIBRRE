@@ -3,15 +3,26 @@ simulate_zero_inflated_beta_random_effect_data <- function(
                                subject.n=50, time.n=5, v=2,
                                alpha=as.matrix(c(0,0.5,-1)),
                                beta=as.matrix(c(-0.5,-0.5,0.5)),
+                               X=NA,Z=NA,
                                s1=0.2, s2=0.2, sim.seed=100){
 
   ######
-  set.seed(sim.seed+10)
-  X <- as.matrix(data.frame(log.Time=as.matrix(log(rep(seq(1,time.n),subject.n))),
-       Treatment=as.matrix(c(rep(0,subject.n*time.n/2),rep(1,subject.n*time.n/2)))))
-  #X <- as.matrix(runif(subject.n*time.n,-1,1))
-  #X  <- as.matrix(c(rep(0,N*time.n/2),rep(1,N*time.n/2)))
-  Z <- X
+  if (length(NA)==1 & any(is.na(X))){
+    set.seed(sim.seed+10)
+    X <- as.matrix(data.frame(log.Time=as.matrix(log(rep(seq(1,time.n),subject.n))),
+        Treatment=as.matrix(c(rep(0,subject.n*time.n/2),rep(1,subject.n*time.n/2)))))
+    #X <- as.matrix(runif(subject.n*time.n,-1,1))
+    #X  <- as.matrix(c(rep(0,N*time.n/2),rep(1,N*time.n/2)))
+  }
+  if(is.null(colnames(X))){
+    X <- as.matrix(X)
+    colnames(X) <- paste('var',seq(1,ncol(X)),sep='')
+  }
+  if (length(NA)==1 & any(is.na(Z))){
+    Z <- X
+  }
+  
+  
   set.seed(sim.seed+1)
   b <- as.matrix(rnorm(subject.n,mean=0,sd=s1))
   b.rep <- as.matrix(as.vector(matrix(b,nrow=time.n,ncol=length(b),byrow=TRUE)))
