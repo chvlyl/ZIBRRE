@@ -65,6 +65,25 @@ antiTNF vs. EEN
 ```
 
 
+```{r function}
+list_to_vector = function(est){
+  res.vec <- c(as.vector(as.vector(est$logistic.est.table)),
+               as.vector(est$beta.est.table),
+               est$logistic.s1.est,
+               est$beta.s2.est,
+               est$beta.v.est,
+               est$overall.test.p)
+  names(res.vec) <- c(paste('logistic',rownames(est$logistic.est.table),'coef',sep='.'),
+                      paste('logistic',rownames(est$logistic.est.table),'pval',sep='.'),
+                      paste('beta',rownames(est$beta.est.table),'coef',sep='.'),
+                      paste('beta',rownames(est$beta.est.table),'pval',sep='.'),
+                      'logistic.s1',
+                      'beta.s2','beta.v','overall.p')
+  return(res.vec)
+}
+```
+
+
 ## Simulation
 
 ### Parameter estimation
@@ -102,7 +121,8 @@ est <- zibre(logistic.cov=X,beta.cov=Z,Y=Y,
     p.species[spe,10] <- est$beta.s2.est
     p.species[spe,11] <- est$beta.v.est
     p.species[spe,12] <- est$overall.test.p
-
+est.veclist_to_vector(est)
+                  
 ```
 
 
