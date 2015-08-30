@@ -59,7 +59,7 @@ simulate_zero_inflated_beta_random_effect_data <- function(
       #rbeta(n, shape1, shape2, ncp = 0)
       set.seed(sim.seed+i)
       Y[i] = rbeta(1, shape1 = u[i]*v, shape2=(1-u[i])*v)
-      if(Y[i]==1){Y_i=1-10^(-6)}
+      if(Y[i]>1-10^(-6)){Y[i]=1-10^(-6)}
       #while(round(Y[i],6)==1){
       #  Y[i] = rbeta(1, shape1 = u[i]*v, shape2=(1-u[i])*v)
       #}
