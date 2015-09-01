@@ -1,8 +1,10 @@
 
 cal_beta_loglik = function(para,Z.aug,Y,subject.n,time.n,
+                           prod.mat=prod.mat,
                                Z.test.coeff.index,
                                quad.n=30){
-  Y.tem <- Y
+  ### Y must be a vector here
+  Y <- as.vector(Y)
   s2 <- para[1]
   v  <- para[2]
   #### Z.test.coeff.index == TRUE means we want to test this parameter
@@ -16,19 +18,20 @@ cal_beta_loglik = function(para,Z.aug,Y,subject.n,time.n,
   gh.weights <- matrix(rep(gherm$weights,subject.n),nrow = subject.n,byrow = TRUE)
   gh.nodes <- matrix(rep(gherm$nodes,subject.n * time.n),
                      nrow = subject.n * time.n,byrow = TRUE)
-  #browser()
+  
   u <- 1 / (1 + exp(-(Z.aug %*% beta[,rep(1,quad.n)] + gh.nodes * s2 * sqrt(2))))
   #### replace Y==0 with NA, so don't use them in the likelihood calculation
-  Y.tem[Y == 0] <- NA
+  #Y.tem[Y == 0] <- NA
+  #### exp(log(A*B)) = exp(logA+logB)=A*B
   #### log likelihood
-  logL <- sum(log(rowSums(
-    gh.weights / sqrt(pi) *
-      apply(u,2, ## for each quad point
-            function(u_m) {
-              apply(matrix(gamma(v)/(gamma(u_m*v)*gamma((1-u_m)*v))*Y.tem^(u_m*v-1)*(1-Y.tem)^((1-u_m)*v-1),nrow = subject.n,ncol = time.n,byrow = TRUE),1,prod,na.rm=TRUE)
-            }#function
-      ) # apply
-    ,na.rm=TRUE)),na.rm=TRUE)
+  #### first calculate the loglikelihood for the ith sbuject
+  log.i <- log(gamma(v)/(gamma(u*v)*gamma((1-u)*v))*Y^(u*v-1)*(1-Y)^((1-u)*v-1))
+  #### logY==0 -> infinite, we want to exclude Y==0 in the likelihood calculation
+  #### replace with infinite with 0, it will be ignored, e^0*e^log(p2)= p2
+  log.i[is.infinite(log.i)] <- 0
+  logL <- sum(log(rowSums(gh.weights / sqrt(pi) * exp(prod.mat %*% log.i),
+                          na.rm=TRUE)),
+              na.rm=TRUE)
   return(-logL)
 }
 
@@ -48,6 +51,7 @@ fit_beta_random_effect = function(Z=Z,Y=Y,
   #############
   subject.n <- length(unique(subject.ind))
   time.n   <- length(unique(time.ind))
+  prod.mat <- matrix(rep(c(rep(1,time.n),rep(0,subject.n*time.n)),subject.n)[1:(subject.n^2*time.n)],byrow=TRUE,nrow=subject.n,ncol=subject.n*time.n)
   #### re-order Z,Y so that values belongs to the same subject are together
   #### need the values in this format for loglikelihood calculation
   gind <- sort(subject.ind,index.return=TRUE)$ix
@@ -63,6 +67,7 @@ fit_beta_random_effect = function(Z=Z,Y=Y,
                    upper = Inf,
                    Z.test.coeff.index = Z.test.coeff.index,
                    Y=Y,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
+                   prod.mat=prod.mat,
                    quad.n=quad.n,
                    control=list(trace=ifelse(verbose,2,0))
   )
@@ -83,6 +88,7 @@ fit_beta_random_effect = function(Z=Z,Y=Y,
                      upper = c(Inf),
                      Z.test.coeff.index = Z.test.coeff.index,
                      Y=Y,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
+                     prod.mat=prod.mat,
                      quad.n=quad.n,
                      control=list(trace=ifelse(verbose,2,0))
     )

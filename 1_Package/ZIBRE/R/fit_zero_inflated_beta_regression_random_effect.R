@@ -4,14 +4,25 @@ cal_zibeta_loglik = function(para,
                            X.aug,Z.aug,Y,
                            X.test.coeff.index,
                            Z.test.coeff.index,
+                           prod.mat=prod.mat,
                            quad.n=30){
   #### s1, s2, v will always be estimated
   logistic.para <- para[1:(sum(!X.test.coeff.index)+1)] ## s1, alpha
   beta.para <- para[-(1:(sum(!X.test.coeff.index)+1))] ## s2,v, beta
-  logistic.logLike <- cal_logistic_loglik(logistic.para,X.aug,Y,subject.n,time.n,
-                                 X.test.coeff.index,quad.n=quad.n)
-  beta.logLike <- cal_beta_loglik(beta.para,Z.aug,Y,subject.n,time.n,
-                             Z.test.coeff.index, quad.n=quad.n)
+  logistic.logLike <- cal_logistic_loglik(para=logistic.para,
+                                          X.aug=X.aug, Y=Y,
+                                          subject.n=subject.n,
+                                          time.n=time.n,
+                                          prod.mat=prod.mat,
+                                          X.test.coeff.index=X.test.coeff.index,
+                                          quad.n=quad.n)
+  beta.logLike <- cal_beta_loglik(para=beta.para,
+                                  Z.aug=Z.aug,Y=Y,
+                                  subject.n=subject.n,
+                                  time.n=time.n,
+                                  Z.test.coeff.index=Z.test.coeff.index, 
+                                  prod.mat=prod.mat,
+                                  quad.n=quad.n)
   return(logistic.logLike+beta.logLike)
 }
 
@@ -30,6 +41,7 @@ fit_zero_inflated_beta_random_effect = function(X=X,Z=Z,Y=Y,
   #############
   subject.n <- length(unique(subject.ind))
   time.n    <- length(unique(time.ind))
+  prod.mat <- matrix(rep(c(rep(1,time.n),rep(0,subject.n*time.n)),subject.n)[1:(subject.n^2*time.n)],byrow=TRUE,nrow=subject.n,ncol=subject.n*time.n)
   ###### estimate and test each parameter
   logistic.fit <- fit_logistic_random_effect(X=X,Y=Y,
                             subject.ind=subject.ind,time.ind=time.ind,
@@ -50,6 +62,7 @@ fit_zero_inflated_beta_random_effect = function(X=X,Z=Z,Y=Y,
                    X.test.coeff.index = X.test.coeff.index,
                    Z.test.coeff.index = Z.test.coeff.index,
                    Y=Y,X.aug=X.aug,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
+                   prod.mat=prod.mat,
                    quad.n=quad.n,
                    control=list(trace=ifelse(verbose,2,0))
   )
@@ -65,6 +78,7 @@ fit_zero_inflated_beta_random_effect = function(X=X,Z=Z,Y=Y,
                    X.test.coeff.index = X.test.coeff.index,
                    Z.test.coeff.index = Z.test.coeff.index,
                    Y=Y,X.aug=X.aug,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
+                   prod.mat=prod.mat,
                    quad.n=quad.n,
                    control=list(trace=ifelse(verbose,2,0))
   )
