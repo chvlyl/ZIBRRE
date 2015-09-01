@@ -18,12 +18,13 @@ cal_beta_loglik = function(para,Z.aug,Y,subject.n,time.n,
                      nrow = subject.n * time.n,byrow = TRUE)
   #browser()
   u <- 1 / (1 + exp(-(Z.aug %*% beta[,rep(1,quad.n)] + gh.nodes * s2 * sqrt(2))))
+  #### replace Y==0 with NA, so don't use them in the likelihood calculation
+  Y.tem[Y == 0] <- NA
   #### log likelihood
   logL <- sum(log(rowSums(
     gh.weights / sqrt(pi) *
       apply(u,2, ## for each quad point
             function(u_m) {
-              Y.tem[Y == 0] <- NA
               apply(matrix(gamma(v)/(gamma(u_m*v)*gamma((1-u_m)*v))*Y.tem^(u_m*v-1)*(1-Y.tem)^((1-u_m)*v-1),nrow = subject.n,ncol = time.n,byrow = TRUE),1,prod,na.rm=TRUE)
             }#function
       ) # apply
