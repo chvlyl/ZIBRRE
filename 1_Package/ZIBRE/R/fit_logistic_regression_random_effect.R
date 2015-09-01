@@ -21,11 +21,12 @@ cal_logistic_loglik = function(para,X.aug,Y,subject.n,time.n,
   gh.weights <- matrix(rep(gherm$weights,subject.n),nrow=subject.n,byrow=TRUE)
   gh.nodes <- matrix(rep(gherm$nodes,subject.n*time.n),nrow=subject.n*time.n,byrow=TRUE)
   p  <- 1 / (1 + exp(-(X.aug%*%alpha[,rep(1,quad.n)] + gh.nodes*s1*sqrt(2))) )
+  ### p^[I(Y>0] * (1-p)^[I[Y=0]]
+  p[Y == 0,] <- 1 - p[Y == 0,]
   logL <- sum(log(rowSums(
     gh.weights / sqrt(pi) *
       apply(p,2, ## for each quad point
             function(p_m) {
-              p_m[Y == 0] <- 1 - p_m[Y == 0]
               apply(matrix(
                 p_m,nrow = subject.n,ncol = time.n,byrow = TRUE
               ),1,prod)
@@ -35,6 +36,8 @@ cal_logistic_loglik = function(para,X.aug,Y,subject.n,time.n,
   return(-logL)
 }
 
+### b <- array(c(1:250000, 1:250000),c(5000,5000,2))
+### system.time(rs4 <- colSums(aperm(b, c(2,1,3))))
 
 #######################################
 fit_logistic_random_effect = function(X=X,Y=Y,
