@@ -1,8 +1,8 @@
 
 cal_beta_loglik = function(para,Z.aug,Y,subject.n,time.n,
                            prod.mat=prod.mat,
-                               Z.test.coeff.index,
-                               quad.n=30){
+                           Z.test.coeff.index,
+                           gh.weights,gh.nodes,quad.n){
   ### Y must be a vector here
   Y <- as.vector(Y)
   s2 <- para[1]
@@ -13,11 +13,6 @@ cal_beta_loglik = function(para,Z.aug,Y,subject.n,time.n,
   beta[Z.test.coeff.index]  <- 0 ## initialized as 0
   beta[!Z.test.coeff.index] <- para[-(1:2)][1:sum(!Z.test.coeff.index)]
   beta <- as.matrix(beta)
-  ####
-  gherm <- generate_gaussian_quad_points(quad.n = quad.n)
-  gh.weights <- matrix(rep(gherm$weights,subject.n),nrow = subject.n,byrow = TRUE)
-  gh.nodes <- matrix(rep(gherm$nodes,subject.n * time.n),
-                     nrow = subject.n * time.n,byrow = TRUE)
   
   u <- 1 / (1 + exp(-(Z.aug %*% beta[,rep(1,quad.n)] + gh.nodes * s2 * sqrt(2))))
   #### replace Y==0 with NA, so don't use them in the likelihood calculation
@@ -52,6 +47,13 @@ fit_beta_random_effect = function(Z=Z,Y=Y,
   subject.n <- length(unique(subject.ind))
   time.n   <- length(unique(time.ind))
   prod.mat <- matrix(rep(c(rep(1,time.n),rep(0,subject.n*time.n)),subject.n)[1:(subject.n^2*time.n)],byrow=TRUE,nrow=subject.n,ncol=subject.n*time.n)
+  #############
+  #### generate quad points
+  gherm <- generate_gaussian_quad_points(quad.n = quad.n)
+  gh.weights <- matrix(rep(gherm$weights,subject.n),nrow = subject.n,byrow = TRUE)
+  gh.nodes <- matrix(rep(gherm$nodes,subject.n * time.n),
+                     nrow = subject.n * time.n,byrow = TRUE)
+  #################
   #### re-order Z,Y so that values belongs to the same subject are together
   #### need the values in this format for loglikelihood calculation
   gind <- sort(subject.ind,index.return=TRUE)$ix
@@ -68,7 +70,7 @@ fit_beta_random_effect = function(Z=Z,Y=Y,
                    Z.test.coeff.index = Z.test.coeff.index,
                    Y=Y,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
                    prod.mat=prod.mat,
-                   quad.n=quad.n,
+                   gh.weights=gh.weights,gh.nodes=gh.nodes,quad.n=quad.n,
                    control=list(trace=ifelse(verbose,2,0))
   )
   #### save the estimatd results
@@ -89,7 +91,7 @@ fit_beta_random_effect = function(Z=Z,Y=Y,
                      Z.test.coeff.index = Z.test.coeff.index,
                      Y=Y,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
                      prod.mat=prod.mat,
-                     quad.n=quad.n,
+                     gh.weights=gh.weights,gh.nodes=gh.nodes,quad.n=quad.n,
                      control=list(trace=ifelse(verbose,2,0))
     )
     #### likelihood ratio test
