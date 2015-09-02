@@ -101,14 +101,13 @@ list_to_vector = function(est){
 
 ### Parameter estimation: beta random effect
 ```{r simulation_beta, cache=TRUE}
-#ptm <- proc.time()
 sim.N <- 100
-sub.N <- c(20,50,100)
+sub.N <- c(20,50,100,200)
 time.N <- c(5)
-#sub.N <- 1000
+#sub.N <- 100
 #time.N <- 5
 beta.true <- as.matrix(c(-0.5,0.5))
-s2.true <- 1.5
+s2.true <- 0.8
 v.true <- 5
 est.avg.list <- list()
 est.var.list <- list()
@@ -120,6 +119,7 @@ for (subject.n in sub.N){
     ### try parallel computing here
     for (sim.n in 1:sim.N){
       cat("Sim ",sim.n,'\n')
+      ptm <- proc.time()
       sim <- simulate_beta_random_effect_data(
                   subject.n=subject.n,time.n=time.n,
                   Z=as.matrix(c(rep(0,subject.n/2*time.n),rep(1,subject.n/2*time.n))),
@@ -137,7 +137,13 @@ for (subject.n in sub.N){
       time.ind  <- sim$time.ind
       Y <- as.matrix(Y)
       Z <- as.matrix(Z)
-      #### beta regression with random effect
+      #library(profr)
+      #p <- profr(fit_beta_random_effect(Z=Z,Y=Y,
+      #             subject.ind=subject.ind,
+      #             time.ind=time.ind,
+      #             quad.n=50,verbose=FALSE)
+      #)
+      #plot(p)
       est <- fit_beta_random_effect(Z=Z,Y=Y,
                    subject.ind=subject.ind,
                    time.ind=time.ind,
@@ -152,18 +158,17 @@ for (subject.n in sub.N){
       #break
     }
     est.mat <- t(as.data.frame(est.list))
-    est.avg.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,mean)
-    est.var.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,sd)
-    break
+    est.avg.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,mean,na.rm=TRUE)
+    est.var.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,sd,na.rm=TRUE)
+    #break
   }
-  break
+  #break
 }
 est.avg.mat <- t(as.data.frame(est.avg.list))
 est.var.mat <- t(as.data.frame(est.var.list))
-#write.csv(est.avg.mat,file=paste('../4_Results/Simulation_Parameter_Estimation_a_n05_1_b_neg05_05_s1_s2_1_v_5_Mean.csv',sep=''))
-#write.csv(est.var.mat,file=paste('../4_Results/Simulation_Parameter_Estimation_a_n05_1_b_neg05_05_s1_s2_1_v_5_Var.csv',sep=''))
-
-#proc.time() - ptm
+write.csv(data.frame(mean=est.avg.mat[,-c(3,4)],sd=est.var.mat[,-c(3,4)]),
+           ## remove the average pval
+          file=paste('../4_Results/Simulation_Parameter_Estimation_Beta_b_neg05_05_s2_08_v_5.csv',sep=''))
 ```
 
 
@@ -172,9 +177,9 @@ est.var.mat <- t(as.data.frame(est.var.list))
 #ptm <- proc.time()
 sim.N <- 10
 #sub.N <- c(20,50,100)
-#time.N <- c(5,10)
+#time.N <- c(5)
 sub.N <- 200
-time.N <- 20
+time.N <- 5
 alpha.true <- as.matrix(c(-0.5,1))
 beta.true <- as.matrix(c(-0.5,0.5))
 s1.true <- 1
@@ -238,9 +243,9 @@ for (subject.n in sub.N){
 }
 est.avg.mat <- t(as.data.frame(est.avg.list))
 est.var.mat <- t(as.data.frame(est.var.list))
-write.csv(est.avg.mat,file=paste('../4_Results/Simulation_Parameter_Estimation_a_n05_1_b_neg05_05_s1_s2_1_v_5_Mean.csv',sep=''))
-write.csv(est.var.mat,file=paste('../4_Results/Simulation_Parameter_Estimation_a_n05_1_b_neg05_05_s1_s2_1_v_5_Var.csv',sep=''))
-
+#write.csv(data.frame(mean=est.avg.mat[,-c(3,4)],sd=est.var.mat[,-c(3,4)]),
+#           ## remove the average pval
+#          file=paste('../4_Results/Simulation_Parameter_Estimation_Logistic_Beta_a_n05_1_b_neg05_05_s1_s2_1_v_5.csv',sep=''))
 #proc.time() - ptm
 ```
 
