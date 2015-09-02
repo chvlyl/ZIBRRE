@@ -21,6 +21,7 @@ cal_beta_loglik = function(para,Z.aug,Y,subject.n,time.n,
   #### log likelihood
   #### first calculate the loglikelihood for the ith sbuject
   log.i <- log(gamma(v)/(gamma(u*v)*gamma((1-u)*v))*Y^(u*v-1)*(1-Y)^((1-u)*v-1))
+  #log.i <- lgamma(v)-lgamma(u*v)-lgamma((1-u)*v) + (u*v-1)*log(Y)+((1-u)*v-1)*log(1-Y)
   #### logY==0 -> infinite, we want to exclude Y==0 in the likelihood calculation
   #### replace with infinite with 0, it will be ignored, e^0*e^log(p2)= p2
   log.i[is.infinite(log.i)] <- 0
