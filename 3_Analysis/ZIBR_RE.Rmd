@@ -67,18 +67,30 @@ antiTNF vs. EEN
 
 ```{r function}
 list_to_vector = function(est){
-  res.vec <- c(as.vector(as.vector(est$logistic.est.table)),
-               as.vector(est$beta.est.table),
-               est$logistic.s1.est,
-               est$beta.s2.est,
-               est$beta.v.est,
-               est$overall.test.p)
-  names(res.vec) <- c(paste('logistic',rownames(est$logistic.est.table),'coef',sep='.'),
-                      paste('logistic',rownames(est$logistic.est.table),'pval',sep='.'),
-                      paste('beta',rownames(est$beta.est.table),'coef',sep='.'),
-                      paste('beta',rownames(est$beta.est.table),'pval',sep='.'),
-                      'logistic.s1',
-                      'beta.s2','beta.v','overall.p')
+  if(length(est) == 3) {
+    res.vec <- c(as.vector(est$est.table),
+                 est$s2.est,
+                 est$v.est)
+    names(res.vec) <- c(paste('beta',rownames(est$est.table),'coef',sep='.'),
+                        paste('beta',rownames(est$est.table),'pval',sep='.'),
+                        'beta.s2','beta.v')
+  }
+  if(length(est) == 6){
+    res.vec <- c(as.vector(as.vector(est$logistic.est.table)),
+                 as.vector(est$beta.est.table),
+                 est$logistic.s1.est,
+                 est$beta.s2.est,
+                 est$beta.v.est,
+                 est$overall.test.p)
+    names(res.vec) <- c(paste('logistic',
+                              rownames(est$logistic.est.table),'coef',sep='.'),
+                        paste('logistic',
+                            rownames(est$logistic.est.table),'pval',sep='.'),
+                        paste('beta',rownames(est$beta.est.table),'coef',sep='.'),
+                        paste('beta',rownames(est$beta.est.table),'pval',sep='.'),
+                        'logistic.s1',
+                        'beta.s2','beta.v','overall.p')
+  }
   return(res.vec)
 }
 ```
@@ -90,7 +102,7 @@ list_to_vector = function(est){
 ### Parameter estimation: beta random effect
 ```{r simulation_beta, cache=TRUE}
 #ptm <- proc.time()
-sim.N <- 10
+sim.N <- 100
 sub.N <- c(20,50,100)
 time.N <- c(5)
 #sub.N <- 1000
@@ -129,19 +141,19 @@ for (subject.n in sub.N){
       est <- fit_beta_random_effect(Z=Z,Y=Y,
                    subject.ind=subject.ind,
                    time.ind=time.ind,
-                   quad.n=50,verbose=TRUE)
-      est.list[[paste('sim',sim.n,sep='')]] <- as.vector(est$est.table)
+                   quad.n=50,verbose=FALSE)
+      est.list[[paste('sim',sim.n,sep='')]] <- list_to_vector(est)
       
       ####
-      beta.data <- data.frame(Y=Y,Z=Z)
-      beta.model <- betareg(Y~var1,data=beta.data)
-      print(summary(beta.model))
-      print(est)
-      break
+      #beta.data <- data.frame(Y=Y,Z=Z)
+      #beta.model <- betareg(Y~var1,data=beta.data)
+      #print(summary(beta.model))
+      #print(est)
+      #break
     }
-    #est.mat <- t(as.data.frame(est.list))
-    #est.avg.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,mean)
-    #est.var.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,sd)
+    est.mat <- t(as.data.frame(est.list))
+    est.avg.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,mean)
+    est.var.list[[paste('subject',subject.n,'time', time.n,sep='')]] <- apply(est.mat,2,sd)
     break
   }
   break
