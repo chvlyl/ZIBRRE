@@ -5,7 +5,7 @@ simulate_beta_random_effect_data = function(subject.n=50, time.n=5, v=2,
   ##########################
   #### Beta regression
   if (length(NA)==1 & any(is.na(Z))){
-    set.seed(sim.seed+10)
+    set.seed(sim.seed*5000+10)
     Z <- as.matrix(data.frame(log.Time=as.matrix(log(rep(seq(1,time.n),subject.n))),
             Treatment=as.matrix(c(rep(0,subject.n*time.n/2),rep(1,subject.n*time.n/2)))))
   }
@@ -14,7 +14,7 @@ simulate_beta_random_effect_data = function(subject.n=50, time.n=5, v=2,
     colnames(Z) <- paste('var',seq(1,ncol(Z)),sep='')
   }
   
-  set.seed(sim.seed+1)
+  set.seed(sim.seed*5000+1)
   c <- as.matrix(rnorm(subject.n,mean=0,sd=s2))
   c.rep <- as.matrix(as.vector(matrix(c,nrow=time.n,ncol=length(c),byrow=TRUE)))
   #####
@@ -29,7 +29,7 @@ simulate_beta_random_effect_data = function(subject.n=50, time.n=5, v=2,
   ## v is the phi
 
   ######
-  set.seed(sim.seed+4)
+  set.seed(sim.seed*5000+4)
   Y <- rbeta(subject.n*time.n, shape1 = u*v, shape2=(1-u)*v)
   if(any(Y>1-10^(-6))){Y[Y>1-10^(-6)] <- 1-10^(-6)}
   

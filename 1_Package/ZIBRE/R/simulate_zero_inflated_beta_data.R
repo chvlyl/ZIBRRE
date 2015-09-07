@@ -8,7 +8,7 @@ simulate_zero_inflated_beta_random_effect_data <- function(
 
   ######
   if (length(NA)==1 & any(is.na(X))){
-    set.seed(sim.seed+10)
+    set.seed(sim.seed*5000+10)
     X <- as.matrix(data.frame(log.Time=as.matrix(log(rep(seq(1,time.n),subject.n))),
         Treatment=as.matrix(c(rep(0,subject.n*time.n/2),rep(1,subject.n*time.n/2)))))
     #X <- as.matrix(runif(subject.n*time.n,-1,1))
@@ -23,10 +23,10 @@ simulate_zero_inflated_beta_random_effect_data <- function(
   }
   
   
-  set.seed(sim.seed+1)
+  set.seed(sim.seed*5000+1)
   b <- as.matrix(rnorm(subject.n,mean=0,sd=s1))
   b.rep <- as.matrix(as.vector(matrix(b,nrow=time.n,ncol=length(b),byrow=TRUE)))
-  set.seed(sim.seed+2)
+  set.seed(sim.seed*5000+2)
   c <- as.matrix(rnorm(subject.n,mean=0,sd=s2))
   c.rep <- as.matrix(as.vector(matrix(c,nrow=time.n,ncol=length(c),byrow=TRUE)))
   #####
@@ -51,13 +51,13 @@ simulate_zero_inflated_beta_random_effect_data <- function(
 
   ######
   Y = rep(NA,subject.n*time.n)
-  set.seed(sim.seed+3)
+  set.seed(sim.seed*5000+3)
   ind.mix <- rbinom(length(Y), 1, p)
   for (i in 1:length(Y)){
     if(ind.mix[i] == 0){Y[i]=0}
     if(ind.mix[i] == 1){
       #rbeta(n, shape1, shape2, ncp = 0)
-      set.seed(sim.seed+i)
+      set.seed(sim.seed*5000+i)
       Y[i] = rbeta(1, shape1 = u[i]*v, shape2=(1-u[i])*v)
       if(Y[i]>1-10^(-6)){Y[i]=1-10^(-6)}
       #while(round(Y[i],6)==1){
