@@ -322,15 +322,15 @@ if (file.exists(sim.temp.file)) {
   #### otherwise, run zibr
   }else{
       if (run.parallel) {
-        sim.list$zibr <- lapply(sim.list$sim.data,
-                                function(sdata) {
-                                  do.call(run_zibre,sdata);
-                                })
-      }else{
         sim.list$zibr <- mclapply(sim.list$sim.data,
                                   function(sdata) {
                                     do.call(run_zibre,sdata);
                                   },mc.cores = 5)
+      }else{
+        sim.list$zibr <- lapply(sim.list$sim.data,
+                                function(sdata) {
+                                  do.call(run_zibre,sdata);
+                                })
       }
     }
   }
