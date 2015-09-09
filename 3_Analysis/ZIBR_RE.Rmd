@@ -273,8 +273,8 @@ subject.n <- 20
 time.n <- 5
 alpha <- as.matrix(c(0.5,0))
 beta <- as.matrix(c(0.5,0))
-s1 <- 0.5
-s2 <- 0.5
+s1 <- 0.1
+s2 <- 0.1
 v <- 5
 
 X=as.matrix(c(rep(0,subject.n/2*time.n),rep(1,subject.n/2*time.n)))
