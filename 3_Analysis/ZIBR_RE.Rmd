@@ -276,7 +276,7 @@ beta <- as.matrix(c(0.5,0))
 s1 <- 0.5
 s2 <- 0.5
 v <- 5
-i <- 1
+
 X=as.matrix(c(rep(0,subject.n/2*time.n),rep(1,subject.n/2*time.n)))
 for (sim.n in 1:sim.N){
   sim.list$true.par[["sim"%+%sim.n]] <- list(subject.n=subject.n, time.n=time.n,
@@ -305,6 +305,7 @@ run_zibre = function(X=X,Y=Y,Z=Z,
 
 ####################################
 #### check if the previous simulation results already exist
+run.parallel <- TRUE
 sim.list$zibr <- list()
 sim.temp.file <- "temp/Simulation_Data_Type_I_Error.rds"
 #### load previous simulation results
@@ -312,14 +313,15 @@ if (file.exists(sim.temp.file)) {
   print("exist")
   sim.list.temp <- readRDS(sim.temp.file)
   ##### check if the simulation data are identical
-  if (identical(sim.list.temp$sim.data, sim.list$sim.data, ignore.environment = TRUE)) {
-    #### if zibr already exists, use the previous results
-    if (exists("zibr",where=sim.list.temp) &
-        (length(sim.list.temp$zibr) == length(sim.list.temp$sim.data))) {
-      sim.list$zibr <- sim.list.temp$zibr
-    #### otherwise, run zibr
-    }else{
-      if (FALSE) {
+  #### if zibr already exists, use the previous results
+  if (exists("zibr",where=sim.list.temp) & 
+      identical(sim.list.temp$sim.data, sim.list$sim.data, ignore.environment = TRUE) &
+      (length(sim.list.temp$zibr) == length(sim.list.temp$sim.data))
+      ) {
+    sim.list$zibr <- sim.list.temp$zibr
+  #### otherwise, run zibr
+  }else{
+      if (run.parallel) {
         sim.list$zibr <- lapply(sim.list$sim.data,
                                 function(sdata) {
                                   do.call(run_zibre,sdata);
@@ -330,7 +332,6 @@ if (file.exists(sim.temp.file)) {
                                     do.call(run_zibre,sdata);
                                   },mc.cores = 5)
       }
-      
     }
   }
 }
@@ -344,10 +345,10 @@ saveRDS(sim.list, "temp/Simulation_Data_Type_I_Error.rds")
 ##spread(L2,value) %>%
 #ggplot(aes(x = value)) + geom_histogram(binwidth = 0.1) + facet_grid( ~ L2) 
 
-#melt(est.list$zibr) %>% 
-##spread(L2,value) %>%
-#group_by(L2) %>%
-#summarize(error=sum(value<0.05)/length(unique(L1)))
+melt(est.list$zibr) %>% 
+#spread(L2,value) %>%
+group_by(L2) %>%
+summarize(error=sum(value<0.05)/length(unique(L1)))
 ```
 
 
