@@ -661,7 +661,7 @@ write.csv(p.species[,-c(3,4,8,9)],file=paste('../4_Results/Real_Data_Estimation_
 
 
 for (spe in spe.all){
-  spe <- 'g__Alistipes'
+  spe <- 'g__Parabacteroides'
   abu <- taxa.data.fit[,spe,drop=FALSE]
   colnames(abu) <- 'Taxa'
   add_rownames(as.data.frame(abu),var='Sample') %>% 
@@ -672,7 +672,7 @@ for (spe in spe.all){
   p<- pdata %>% dplyr::filter(Taxa>0) %>%
   #cor(log10(p$Taxa),p$log.FCP,method='spearman')
   ggplot(aes(log.FCP,log(Taxa/(100-Taxa))))+
-  geom_point() #+ 
+  geom_point() + ggtitle(spe)
   #facet_grid(.~Response, margins=TRUE) +
   #ylim(c(0,5))
   #print(p)
