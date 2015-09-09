@@ -334,7 +334,6 @@ if (file.exists(sim.temp.file)) {
       }
     }
   }
-}
 saveRDS(sim.list, "temp/Simulation_Data_Type_I_Error.rds")
 
 
@@ -437,6 +436,7 @@ group_by(Subject) %>% summarise(count = n()) %>% dplyr::filter(count==4) %>%
 dplyr::select(Subject) %>%
 left_join(add_rownames(sample.info,var = 'Sample'),by='Subject') %>%
 mutate(Response=ifelse(Response=='Response',1,0)) %>%
+mutate(Time=ifelse(Time=='1',0,ifelse(Time=='2',1,ifelse(Time=='3',4,ifelse(Time=='4',8,NA))))) %>% 
 dplyr::select(Sample,Subject,Time,Response)
 
 ######
