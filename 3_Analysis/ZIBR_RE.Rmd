@@ -16,6 +16,7 @@ output:
 ```{r setup, include=FALSE}
 ####### install necessary packages
 packages <- c(#'knitr',
+              'foreach','doParallel',
               'metakit',
               'pheatmap','reshape2',
               'ggplot2','tidyr','dplyr')
@@ -37,7 +38,7 @@ for (pk in packages){
 #########################
 ### change the working directory
 try(setwd('3_Analysis/'))
-
+try(dir.create("temp"))
 
 #####################################################
 #### load the package instead of sourcing the code in the future  
@@ -92,6 +93,10 @@ list_to_vector = function(est){
                         'beta.s2','beta.v','overall.p')
   }
   return(res.vec)
+}
+
+`%+%` = function(x,y){
+  paste(x,y,sep='')
 }
 ```
 
@@ -248,6 +253,99 @@ est.var.mat <- t(as.data.frame(est.var.list))
 #          file=paste('../4_Results/Simulation_Parameter_Estimation_Logistic_Beta_a_neg05_1_b_neg05_05_s1_1_s2_08_v_5.csv',sep=''))
 #proc.time() - ptm
 ```
+
+
+
+
+### Type I error: zero-inflated beta random effect
+```{r simulation_type_1_error, cache=TRUE}
+##############################
+####sim.list$true.par
+####sim.list$sim.data
+####sim.list$zibr
+sim.list <- list()
+
+##############################
+##### generate true parameters
+sim.list$true.par <- list()
+sim.N <- 5
+subject.n <- 20
+time.n <- 5
+alpha <- as.matrix(c(0.5,0))
+beta <- as.matrix(c(0.5,0))
+s1 <- 0.5
+s2 <- 0.5
+v <- 5
+i <- 1
+X=as.matrix(c(rep(0,subject.n/2*time.n),rep(1,subject.n/2*time.n)))
+for (sim.n in 1:sim.N){
+  sim.list$true.par[["sim"%+%sim.n]] <- list(subject.n=subject.n, time.n=time.n,
+                     alpha=alpha, beta=beta,
+                     s1=s1, s2=s2,v=v,
+                     X=X,sim.seed=sim.n)
+}
+
+#############################
+### generate simulation data
+sim.list$sim.data <- list()
+sim.list$sim.data <- lapply(true.par,function(true.p){do.call(simulate_zero_inflated_beta_random_effect_data,true.p)})
+
+#############################
+### run models on simulated data
+run_zibre = function(X=X,Y=Y,Z=Z,
+                   subject.ind=subject.ind,
+                   time.ind=time.ind,...){
+  est <- zibre(logistic.cov=X,beta.cov=Z,Y=Y,
+                   subject.ind=subject.ind,
+                   time.ind=time.ind,
+                   quad.n=30,verbose=TRUE)
+  return(list(logistic.p=est$logistic.est.table[[2,2]],beta.p=est$beta.est.table[[2,2]],overall.p=est$overall.test.p))
+}
+
+
+####################################
+#### check if the previous simulation results already exist
+sim.list$zibr <- list()
+sim.temp.file <- "temp/Simulation_Data_Type_I_Error.rds"
+if (file.exists(sim.temp.file)) {
+  print("exist")
+  sim.list.temp <- readRDS(sim.temp.file)
+  if (identical(sim.list.temp$sim.data, sim.list$sim.data, ignore.environment = TRUE)) {
+    if (exists("zibr",where=sim.list.temp)) &
+        (length(sim.list.temp$zibr) == length(sim.list.temp$sim.data))) {
+      sim.list$zibr <- sim.list.temp$zibr
+    }else{
+      if (FALSE) {
+        sim.list$zibr <- lapply(sim.data,
+                                function(sdata) {
+                                  do.call(run_zibre,sdata);
+                                })
+      }else{
+        sim.list$zibr <- mclapply(sim.data,
+                                  function(sdata) {
+                                    do.call(run_zibre,sdata);
+                                  },mc.cores = 5)
+      }
+      
+    }
+  }
+}
+saveRDS(sim.list, "temp/Simulation_Data_Type_I_Error.rds")
+
+
+
+###################################
+### evaluate the simulation results
+#melt(est.list$zibr) %>% 
+##spread(L2,value) %>%
+#ggplot(aes(x = value)) + geom_histogram(binwidth = 0.1) + facet_grid( ~ L2) 
+
+#melt(est.list$zibr) %>% 
+##spread(L2,value) %>%
+#group_by(L2) %>%
+#summarize(error=sum(value<0.05)/length(unique(L1)))
+```
+
 
 
 ## Real data analysis
