@@ -268,7 +268,7 @@ sim.list <- list()
 ##############################
 ##### generate true parameters
 sim.list$true.par <- list()
-sim.N <- 5
+sim.N <- 10000
 subject.n <- 20
 time.n <- 5
 alpha <- as.matrix(c(0.5,0))
@@ -288,7 +288,7 @@ for (sim.n in 1:sim.N){
 #############################
 ### generate simulation data
 sim.list$sim.data <- list()
-sim.list$sim.data <- lapply(true.par,function(true.p){do.call(simulate_zero_inflated_beta_random_effect_data,true.p)})
+sim.list$sim.data <- lapply(sim.list$true.par,function(true.p){do.call(simulate_zero_inflated_beta_random_effect_data,true.p)})
 
 #############################
 ### run models on simulated data
@@ -307,21 +307,25 @@ run_zibre = function(X=X,Y=Y,Z=Z,
 #### check if the previous simulation results already exist
 sim.list$zibr <- list()
 sim.temp.file <- "temp/Simulation_Data_Type_I_Error.rds"
+#### load previous simulation results
 if (file.exists(sim.temp.file)) {
   print("exist")
   sim.list.temp <- readRDS(sim.temp.file)
+  ##### check if the simulation data are identical
   if (identical(sim.list.temp$sim.data, sim.list$sim.data, ignore.environment = TRUE)) {
-    if (exists("zibr",where=sim.list.temp)) &
+    #### if zibr already exists, use the previous results
+    if (exists("zibr",where=sim.list.temp) &
         (length(sim.list.temp$zibr) == length(sim.list.temp$sim.data))) {
       sim.list$zibr <- sim.list.temp$zibr
+    #### otherwise, run zibr
     }else{
       if (FALSE) {
-        sim.list$zibr <- lapply(sim.data,
+        sim.list$zibr <- lapply(sim.list$sim.data,
                                 function(sdata) {
                                   do.call(run_zibre,sdata);
                                 })
       }else{
-        sim.list$zibr <- mclapply(sim.data,
+        sim.list$zibr <- mclapply(sim.list$sim.data,
                                   function(sdata) {
                                     do.call(run_zibre,sdata);
                                   },mc.cores = 5)
