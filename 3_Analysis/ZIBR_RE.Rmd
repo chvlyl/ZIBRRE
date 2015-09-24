@@ -11,8 +11,6 @@ output:
 
 
 
-
-
 ```{r setup, include=FALSE}
 ####### install necessary packages
 packages <- c(#'knitr',
@@ -58,6 +56,7 @@ source('../1_Package/ZIBRE/R/simulate_zero_inflated_beta_data.R')
 #  progress = TRUE, verbose = TRUE,
 #  warning=FALSE, message=FALSE,echo=TRUE)
 ```  
+
 
 ```{r note,inclue=FALSE, eval=FALSE}
 only fit beta
@@ -269,7 +268,7 @@ sim.list <- list()
 ##### generate true parameters
 sim.list$true.par <- list()
 sim.N <- 10000
-subject.n <- 20
+subject.n <- 100
 time.n <- 5
 alpha <- as.matrix(c(0.5,0))
 beta <- as.matrix(c(0.5,0))
@@ -333,6 +332,17 @@ if (file.exists(sim.temp.file)) {
                                 })
       }
     }
+} else{
+  if (run.parallel) {
+    sim.list$zibr <- mclapply(sim.list$sim.data,
+                              function(sdata) {
+                                do.call(run_zibre,sdata);
+                              },mc.cores = 5)
+  }else{
+    sim.list$zibr <- lapply(sim.list$sim.data,
+                            function(sdata) {
+                              do.call(run_zibre,sdata);
+                            })
   }
 }
 saveRDS(sim.list, "temp/Simulation_Data_Type_I_Error.rds")
@@ -341,11 +351,11 @@ saveRDS(sim.list, "temp/Simulation_Data_Type_I_Error.rds")
 
 ###################################
 ### evaluate the simulation results
-#melt(est.list$zibr) %>% 
+#melt(sim.list$zibr) %>% 
 ##spread(L2,value) %>%
 #ggplot(aes(x = value)) + geom_histogram(binwidth = 0.1) + facet_grid( ~ L2) 
 
-melt(est.list$zibr) %>% 
+melt(sim.list$zibr) %>% 
 #spread(L2,value) %>%
 group_by(L2) %>%
 summarize(error=sum(value<0.05)/length(unique(L1)))
