@@ -16,12 +16,14 @@ cal_logistic_loglik = function(para,X.aug,Y,subject.n,time.n,
   alpha[X.test.coeff.index]  <- 0 ## initialized as 0
   alpha[!X.test.coeff.index] <- para[-1][1:sum(!X.test.coeff.index)]
   alpha <- as.matrix(alpha)
-  ####
+  #### p can not be 0 or 1. Due to round error, logL will be NA
+  #### manually set p=0 or p=1 to some other values
   p  <- 1 / (1 + exp(-(X.aug%*%alpha[,rep(1,quad.n)] + gh.nodes*s1*sqrt(2))) )
+  p[p<10^(-7)] <- 10^(-7)
+  p[p>(1-10^(-7))] <- (1-10^(-7))
   ### because p^[I(Y>0] * (1-p)^[I[Y=0]], replace p[Y==0] with 1-p[Y==0]
   p[Y == 0,] <- 1 - p[Y == 0,]
   #### exp(log(A*B)) = exp(logA+logB)=A*B
-  #browser()
   logL <- sum(log(rowSums(gh.weights / sqrt(pi) * exp(prod.mat %*% log(p)))))
   return(-logL)
 }
@@ -60,6 +62,7 @@ fit_logistic_random_effect = function(X=X,Y=Y,
   X.aug <- X.aug[gind,]
   ##### H1: estimate all parameters
   X.test.coeff.index <- rep(FALSE,ncol(X.aug))
+  #browser()
   opt.H1 <- nlminb(start=c(1,rep(0,sum(!X.test.coeff.index))), ## s1,alpha
                    objective=cal_logistic_loglik,
                    lower = c(0.00001,
