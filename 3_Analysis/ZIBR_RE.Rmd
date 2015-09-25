@@ -524,10 +524,10 @@ for (spe in spe.all){
 ```
 
 
-### Fit ZIBR on real data: treatment
+### Fit ZIBR on real data: antiTNF vs. EEN
 ```{r fit_zibrre_treatment}
-
-######
+#### create covariates, 
+#### Time, antiTNF+EEN
 reg.cov <-
 data.frame(Sample=rownames(taxa.data),stringsAsFactors = FALSE) %>% 
 left_join(add_rownames(sample.info,var = 'Sample'),by='Sample')%>%
@@ -537,35 +537,30 @@ group_by(Subject) %>% summarise(count = n()) %>% dplyr::filter(count==4) %>%
 dplyr::select(Subject) %>%
 left_join(add_rownames(sample.info,var = 'Sample'),by='Subject') %>%
 mutate(Treat=ifelse(Treatment.Specific=='antiTNF',1,0)) %>%
-dplyr::select(Sample,Subject,Time,Response,Treat)
-
-######
-X <- as.matrix(reg.cov[,c('Treat')])
-colnames(X) <- 'Treat'
-rownames(X) <- reg.cov$Sample
-Z <- X
-subject.ind <- reg.cov$Subject
-time.ind   <- reg.cov$Time
-taxa.data.fit  <- taxa.data[reg.cov$Sample,]
+dplyr::select(Sample,Subject,Time,Response,Treat) %>%
+dplyr::mutate(Time=ifelse(Time=='1',0,ifelse(Time=='2',1,ifelse(Time=='3',4,ifelse(Time=='4',8,NA))))) %>%
+dplyr::mutate(Time.X.Treatment=Time*Treat) %>%
+as.data.frame
+### take out first time point
+reg.cov.t1   <-  subset(reg.cov,Time==0)
+reg.cov.t234 <-  subset(reg.cov,Time!=0)
 
 ###############
-
 spe.all <- colnames(taxa.data.fit)
-p.species = matrix(NA,nrow=length(spe.all),ncol=12)
-rownames(p.species) = spe.all
-colnames(p.species) = c('logistic.treat.coef','logistic.treat.pval',
-                        'logistic.time.coef','logistic.time.pval',
-                        'logstic.s1',
-                        'beta.treat.coef','beta.treat.pval',
-                        'beta.time.coef','beta.time.pval',
-                        'beta.s2','beta.v',
-                        'overall.p')
-
+p.species.list <- list()
 
 for (spe in spe.all){
+  ###### create covariates
+  X <- data.frame(reg.cov.t234[,c('Time','Treat','Time.X.Treatment')],
+                 Baseline=taxa.data[reg.cov.t1$Sample, spe]/100)
+  rownames(X) <- reg.cov.t234$Sample
+  Z <- X
+  subject.ind <- reg.cov.t234$Subject
+  time.ind   <- reg.cov.t234$Time
+  ####
   #spe <- 'g__Escherichia'
   cat(spe,'\n')
-  Y <- taxa.data.fit[,spe,drop=F]/100
+  Y <- taxa.data[reg.cov.t234$Sample, spe]/100
   cat('Zeros/All',sum(Y==0),'/',length(Y),'\n')
   if (sum(Y>0)<10 | sum(Y==0) <10 | max(Y)<0.01){
     print('skip')
@@ -575,81 +570,77 @@ for (spe in spe.all){
                  subject.ind=subject.ind,
                  time.ind=time.ind,
                  quad.n=30,verbose=TRUE)
-    p.species[spe,c(1,2)] <- as.vector(est$logistic.est.table[-1,])
-    p.species[spe,c(6,7)] <- as.vector(est$beta.est.table[-1,])
-    p.species[spe,5]  <-  est$logistic.s1.est
-    p.species[spe,10] <- est$beta.s2.est
-    p.species[spe,11] <- est$beta.v.est
-    p.species[spe,12] <- est$overall.test.p
+    p.species.list[[spe]] <- list_to_vector(est)
   }
   #break
 }
 
 ####
-write.csv(p.species[,-c(3,4,8,9)],file=paste('../4_Results/Real_Data_Estimation_Results_Treatment_antiTNF_EEN.csv',sep=''))
+p.species <- t(as.data.frame(p.species.list))
+####
+write.csv(signif(p.species[,-grep('intersept',colnames(p.species))],3),file=paste('../4_Results/Real_Data_Estimation_Results_Treatment_antiTNF_EEN.csv',sep=''))
 
 # ####################
 # #### Boxplot
-# for (spe in spe.all){
-#   #spe <- 'g__Parabacteroides'
-#   abu <- taxa.data.fit[,spe,drop=FALSE]
-#   colnames(abu) <- 'Taxa'
-#   add_rownames(as.data.frame(abu),var='Sample') %>% 
-#   left_join(add_rownames(sample.info,var='Sample'),by='Sample') %>% 
-#   dplyr::select(Taxa,Response,Time) %>%
-#   dplyr::mutate(dummy=factor(1)) %>%
-#   (function(pdata){
-#   p<- pdata %>% dplyr::filter(Taxa>0) %>%
-#   ggplot(aes(factor(Time),Taxa))+
-#   geom_boxplot() + 
-#   facet_grid(.~Response, margins=TRUE) +
-#   ylim(c(0,5))
-#   plot(p)
-#   })
-# }
+for (spe in spe.all){
+  #spe <- 'g__Streptococcus'
+  #spe <- "g__Bacteroides" 
+  ####
+  p<- data.frame(reg.cov.t234,
+                 Baseline=taxa.data[reg.cov.t1$Sample, spe],
+                 Taxa=taxa.data[reg.cov.t234$Sample, spe]) %>%
+  dplyr::mutate(Treatment=ifelse(Treat==1,"anitTNF","EEN")) %>%
+  dplyr::select(Subject, Time, Treatment, Taxa) %>%
+  ggplot(aes(factor(Time),Taxa,fill=factor(Treatment)))+  
+  geom_boxplot() + 
+  #geom_point() + stat_smooth(method=loess) +
+  #stat_summary(aes(group=Treatment), fun.y=median, geom="line", colour="green") +
+  #geom_jitter() +
+  #coord_cartesian(ylim=c(0,10)) +
+    #ylim(c(0,5)) + 
+  ggtitle(spe)
+  plot(p)
+  
+}
 ```
 
 ### Fit ZIBR on real data: logFCP
 ```{r fit_zibrre_logfcp}
-######
+#### create covariates, 
+#### Time, logFCP
 reg.cov <-
 data.frame(Sample=rownames(taxa.data),stringsAsFactors = FALSE) %>% 
 left_join(add_rownames(sample.info,var = 'Sample'),by='Sample')%>%
-dplyr::filter(!is.na(log.FCP)) %>%
-dplyr::select(Sample,Time,Subject,log.FCP) %>%
+dplyr::filter(!is.na(FCP)) %>%
+dplyr::select(Sample,Time,Subject,Response,log.FCP) %>%
 group_by(Subject) %>% summarise(count = n()) %>% dplyr::filter(count==4) %>%
 dplyr::select(Subject) %>%
 left_join(add_rownames(sample.info,var = 'Sample'),by='Subject') %>%
-#mutate(FCP=log10(FCP)) %>%
-dplyr::select(Sample,Subject,Time,log.FCP)
-
-######
-X <- as.matrix(reg.cov[,c('log.FCP')])
-colnames(X) <- 'log.FCP'
-rownames(X) <- reg.cov$Sample
-Z <- X
-subject.ind <- reg.cov$Subject
-time.ind   <- reg.cov$Time
-taxa.data.fit  <- taxa.data[reg.cov$Sample,]
+#mutate(Treat=ifelse(Treatment.Specific=='antiTNF',1,0)) %>%
+dplyr::select(Sample,Subject,Time,Response,log.FCP) %>%
+dplyr::mutate(Time=ifelse(Time=='1',0,ifelse(Time=='2',1,ifelse(Time=='3',4,ifelse(Time=='4',8,NA))))) %>%
+#dplyr::mutate(Time.X.Treatment=Time*Treat) %>%
+as.data.frame
+### take out first time point
+reg.cov.t1   <-  subset(reg.cov,Time==0)
+reg.cov.t234 <-  subset(reg.cov,Time!=0)
 
 ###############
-
 spe.all <- colnames(taxa.data.fit)
-p.species = matrix(NA,nrow=length(spe.all),ncol=12)
-rownames(p.species) = spe.all
-colnames(p.species) = c('logistic.logFCP.coef','logistic.logFCP.pval',
-                        'logistic.time.coef','logistic.time.pval',
-                        'logstic.s1',
-                        'beta.logFCP.coef','beta.logFCP.pval',
-                        'beta.time.coef','beta.time.pval',
-                        'beta.s2','beta.v',
-                        'overall.p')
-
+p.species.list <- list()
 
 for (spe in spe.all){
-  #spe <- 'g__Haemophilu'
+  ###### create covariates
+  X <- data.frame(reg.cov.t234[,c('Time','log.FCP')],
+                 Baseline=taxa.data[reg.cov.t1$Sample, spe]/100)
+  rownames(X) <- reg.cov.t234$Sample
+  Z <- X
+  subject.ind <- reg.cov.t234$Subject
+  time.ind   <- reg.cov.t234$Time
+  ####
+  #spe <- 'g__Escherichia'
   cat(spe,'\n')
-  Y <- taxa.data.fit[,spe,drop=F]/100
+  Y <- taxa.data[reg.cov.t234$Sample, spe]/100
   cat('Zeros/All',sum(Y==0),'/',length(Y),'\n')
   if (sum(Y>0)<10 | sum(Y==0) <10 | max(Y)<0.01){
     print('skip')
@@ -659,45 +650,36 @@ for (spe in spe.all){
                  subject.ind=subject.ind,
                  time.ind=time.ind,
                  quad.n=30,verbose=TRUE)
-    p.species[spe,c(1,2)] <- as.vector(est$logistic.est.table[-1,])
-    p.species[spe,c(6,7)] <- as.vector(est$beta.est.table[-1,])
-    p.species[spe,5]  <-  est$logistic.s1.est
-    p.species[spe,10] <- est$beta.s2.est
-    p.species[spe,11] <- est$beta.v.est
-    p.species[spe,12] <- est$overall.test.p
+    p.species.list[[spe]] <- list_to_vector(est)
   }
   #break
 }
 
 ####
-write.csv(p.species[,-c(3,4,8,9)],file=paste('../4_Results/Real_Data_Estimation_Results_logFCP.csv',sep=''))
-#####
+p.species <- t(as.data.frame(p.species.list))
+####
+write.csv(signif(p.species[,-grep('intersept',colnames(p.species))],3),file=paste('../4_Results/Real_Data_Estimation_Results_logFCP.csv',sep=''))
 
-
+# ####################
+# #### Boxplot
 for (spe in spe.all){
-  spe <- 'g__Alistipes'
-  abu <- taxa.data.fit[,spe,drop=FALSE]
-  colnames(abu) <- 'Taxa'
-  add_rownames(as.data.frame(abu),var='Sample') %>% 
-  left_join(add_rownames(sample.info,var='Sample'),by='Sample') %>% 
-  dplyr::select(Taxa,log.FCP,Time,Subject,Treatment.Specific,Response) %>%
-  dplyr::mutate(dummy=factor(1)) %>%
-  (function(pdata){
-  p<- pdata %>% dplyr::filter(Taxa>0) %>%
-  #cor(log10(p$Taxa),p$log.FCP,method='spearman')
-  ggplot(aes(log.FCP,log(Taxa/(100-Taxa)),colour=factor(Subject),group=factor(Subject)))+
-  geom_point() + geom_line() + ggtitle(spe) + facet_grid(Treatment.Specific ~ Response)
-  #facet_grid(.~Response, margins=TRUE) +
-  #ylim(c(0,5))
-  #print(p)
+  #spe <- 'g__Streptococcus'
+  spe <- "g__Parabacteroides"
+  spe <- "g__Alistipes"
+  ####
+  p<- data.frame(reg.cov.t234,
+                 Baseline=taxa.data[reg.cov.t1$Sample, spe],
+                 Taxa=taxa.data[reg.cov.t234$Sample, spe]) %>%
+  #dplyr::mutate(Treatment=ifelse(Treat==1,"anitTNF","EEN")) %>%
+  #dplyr::select(Subject, Time, Treatment, Taxa) %>%
+  ggplot(aes(log.FCP,Taxa,color=factor(Time)))+ geom_point() + 
+  #stat_summary(aes(group=Treatment), fun.y=mean, geom="line", colour="green") +
+  #geom_jitter() +
+  #coord_cartesian(ylim=c(0,2)) +
+    #ylim(c(0,5)) + 
+  ggtitle(spe)
   plot(p)
-  })
   
-  #############
-  add_rownames(as.data.frame(abu),var='Sample') %>% 
-  left_join(add_rownames(sample.info,var='Sample'),by='Sample') %>% 
-  dplyr::select(Taxa,log.FCP,Time,Subject) %>%
-  dplyr::filter(Taxa>0) %>% as.data.frame
 }
 ```
 
