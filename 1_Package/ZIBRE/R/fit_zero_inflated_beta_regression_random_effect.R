@@ -59,6 +59,51 @@ fit_zero_inflated_beta_random_effect = function(X=X,Z=Z,Y=Y,
   beta.fit <- fit_beta_random_effect(Z=Z,Y=Y,subject.ind=subject.ind,time.ind=time.ind,
                          quad.n=quad.n,verbose=verbose)
   ##################################
+  ##### jointly test each variable in logistic and beta component
+  #####
+  ##### H1
+  X.test.coeff.index <- rep(FALSE,ncol(X.aug))
+  Z.test.coeff.index <- rep(FALSE,ncol(Z.aug))
+  opt.H1 <- nlminb(start= c(c(1,rep(0,sum(!X.test.coeff.index))), ## s1,alpha
+                            c(1,2,rep(0,sum(!Z.test.coeff.index)))), ## s2,v,beta
+                   objective=cal_zibeta_loglik,
+                   lower = c(c(0.00001,rep(-Inf,sum(!X.test.coeff.index))),
+                             c(0.00001,0.00001,rep(-Inf,sum(!Z.test.coeff.index)))),
+                   upper = Inf,
+                   X.test.coeff.index = X.test.coeff.index,
+                   Z.test.coeff.index = Z.test.coeff.index,
+                   Y=Y,X.aug=X.aug,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
+                   prod.mat=prod.mat,
+                   gh.weights=gh.weights,gh.nodes=gh.nodes,
+                   quad.n=quad.n,
+                   control=list(trace=ifelse(verbose,2,0))
+  )
+  ###### H0:set all regression coefficients to zero, excluding intercept
+  joint.p <- rep(NA,ncol(X.aug))
+  for (i in 2:ncol(X.aug)){
+    X.test.coeff.index <- rep(FALSE,ncol(X.aug))
+    Z.test.coeff.index <- rep(FALSE,ncol(Z.aug))
+    X.test.coeff.index[i] <- TRUE
+    Z.test.coeff.index[i] <- TRUE
+    opt.H0 <- nlminb(start= c(c(1,rep(0,sum(!X.test.coeff.index))), ## s1,alpha
+                              c(1,2,rep(0,sum(!Z.test.coeff.index)))), ## s2,v,beta
+                     objective=cal_zibeta_loglik,
+                     lower = c(c(0.00001,rep(-Inf,sum(!X.test.coeff.index))),
+                               c(0.00001,0.00001,rep(-Inf,sum(!Z.test.coeff.index)))),
+                     upper = Inf,
+                     X.test.coeff.index = X.test.coeff.index,
+                     Z.test.coeff.index = Z.test.coeff.index,
+                     Y=Y,X.aug=X.aug,Z.aug=Z.aug,time.n=time.n,subject.n=subject.n,
+                     prod.mat=prod.mat,
+                     gh.weights=gh.weights,gh.nodes=gh.nodes,
+                     quad.n=quad.n,
+                     control=list(trace=ifelse(verbose,2,0))
+    )
+    likelihodd.ratio <- -2*(-opt.H0$objective-(-opt.H1$objective))
+    joint.p[i] <- 1-pchisq(likelihodd.ratio,df=sum(X.test.coeff.index)+sum(Z.test.coeff.index))
+  }
+  names(joint.p) <- c('overall',colnames(X))
+  ##################################
   ##### test the overall difference
   ##### H1: estimate all parameters
   X.test.coeff.index <- rep(FALSE,ncol(X.aug))
@@ -96,11 +141,12 @@ fit_zero_inflated_beta_random_effect = function(X=X,Z=Z,Y=Y,
   )
   likelihodd.ratio <- -2*(-opt.H0$objective-(-opt.H1$objective))
   overall.LRT.p <- 1-pchisq(likelihodd.ratio,df=sum(X.test.coeff.index)+sum(Z.test.coeff.index))
-
+  joint.p[1] <- overall.LRT.p
+  
   return(list(logistic.est.table=logistic.fit$est.table,
               logistic.s1.est=logistic.fit$s1.est,
               beta.est.table=beta.fit$est.table,
               beta.s2.est=beta.fit$s2.est,
               beta.v.est=beta.fit$v.est,
-              overall.test.p=overall.LRT.p))
+              overall.test.p=joint.p))
 }
